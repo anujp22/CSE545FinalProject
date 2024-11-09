@@ -12,5 +12,6 @@ def read_items_file(file_path):
     item_weights = [int(line.strip()) for line in lines[1:]]
     return bin_capacity, item_weights
 
-capacity, weights = read_items_file(input_file)
+BinPackingProblem = read_items_file(input_file)
+print(BinPackingProblem)
 
