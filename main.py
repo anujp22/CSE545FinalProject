@@ -1,17 +1,206 @@
-input_file = "mixed_data.txt"
+import random
+import numpy as np
+import matplotlib.pyplot as plt
+import tkinter as tk
+from tkinter import ttk
+
+# Dataset details
+inputFile = "large2Data.txt"
+
 
 class BinPackingProblem:
-    def __init__(self, capacity, item_weights):
+    def __init__(self, capacity, itemWeights):
         self.capacity = capacity
-        self.item_weights = item_weights
+        self.itemWeights = itemWeights
 
-def read_items_file(file_path):
-    with open(file_path, "r") as f:
-        lines = f.readlines()  
-    bin_capacity = int(lines[0].strip().split(":")[1].strip())
-    item_weights = [int(line.strip()) for line in lines[1:]]
-    return bin_capacity, item_weights
 
-BinPackingProblem = read_items_file(input_file)
-print(BinPackingProblem)
+def readItemsFile(filePath):
+    with open(filePath, "r") as f:
+        lines = f.readlines()
+    binCapacity = int(lines[0].strip().split(":")[1].strip())
+    itemWeights = [int(line.strip()) for line in lines[1:]]
+    return binCapacity, itemWeights
 
+
+binCapacity, items = readItemsFile(inputFile)
+
+
+# Genetic Algorithm Classes and Functions
+class Individual:
+    def fitness(solution, binCapacity):
+        bins = []
+        for itemSize in solution:
+            placed = False
+            for bin in bins:
+                if sum(bin) + itemSize <= binCapacity:
+                    bin.append(itemSize)
+                    placed = True
+                    break
+            if not placed:
+                bins.append([itemSize])
+        return len(bins)
+
+
+def createInitialPopulation(items, populationSize, binCapacity):
+    population = [random.sample(items, len(items)) for _ in range(populationSize)]
+    return population
+
+
+def selection(population, fitnesses, tournamentSize):
+    # Ensure tournamentSize is not larger than the population size
+    tournamentSize = min(tournamentSize, len(population))
+    selected = []
+    for _ in range(len(population)):
+        tournament = random.sample(list(zip(population, fitnesses)), tournamentSize)
+        selected.append(min(tournament, key=lambda x: x[1])[0])
+    return selected
+
+
+def crossover(parent1, parent2, binCapacity):
+    midpoint = len(parent1) // 2
+    child = parent1[:midpoint] + parent2[midpoint:]
+    return child
+
+
+def mutate(solution, binCapacity, mutationRate=0.1):
+    for _ in range(int(len(solution) * mutationRate)):
+        i, j = random.sample(range(len(solution)), 2)
+        solution[i], solution[j] = solution[j], solution[i]
+
+
+def wisdomOfCrowds(population, fitnesses, binCapacity, numExperts=0.4):
+    numExperts = max(1, int(len(population) * numExperts))
+    expertIndices = np.argsort(fitnesses)[:numExperts]
+    experts = [population[i] for i in expertIndices]
+    combinedSolution = []
+    for expert in experts:
+        for item in expert:
+            if item not in combinedSolution:
+                combinedSolution.append(item)
+    return combinedSolution
+
+
+# Main GA Function with GUI Integration
+class BinPackingGUI(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Bin Packing Problem - GA with Wisdom of Crowds")
+        self.geometry("800x600")
+
+        # Frame for results display
+        self.resultsFrame = tk.Frame(self)
+        self.resultsFrame.pack(pady=10)
+
+        # Run button
+        self.runButton = tk.Button(
+            self, text="Run Algorithm", command=self.runAlgorithm
+        )
+        self.runButton.pack(pady=20)
+
+        # Label for best solution display
+        self.bestSolutionLabel = tk.Label(
+            self.resultsFrame, text="", font=("Arial", 12)
+        )
+        self.bestSolutionLabel.pack()
+
+    def runAlgorithm(self):
+
+        populationSize = 50
+        generations = 100
+        mutationRate = 0.05
+        tournamentSize = min(3, populationSize)
+
+        bestSolution, improvementCurve = hybridGeneticAlgorithmBPP(
+            items,
+            binCapacity,
+            populationSize,
+            generations,
+            mutationRate,
+            tournamentSize,
+        )
+
+        bestBinCount = Individual.fitness(bestSolution, binCapacity)
+
+        # Display best solution in the GUI
+        self.bestSolutionLabel.config(
+            text=f"Best Solution Uses {bestBinCount} Bins\nBest Solution: {bestSolution}"
+        )
+
+        # Plot the improvement curve in the GUI
+        self.plotImprovementCurve(improvementCurve)
+
+        # Print the results to the terminal
+        self.printResults(bestSolution, improvementCurve)
+
+    def plotImprovementCurve(self, improvementCurve):
+        plt.figure(figsize=(8, 6))
+        plt.plot(improvementCurve, marker="o", color="b", label="Bins Used")
+        plt.title("Improvement Over Generations")
+        plt.xlabel("Generation")
+        plt.ylabel("Number of Bins Used")
+        plt.grid(True)
+        plt.legend()
+        plt.show()
+
+    def printResults(self, bestSolution, improvementCurve):
+        # Print the best solution and improvement curve to the terminal
+        bestBinCount = Individual.fitness(bestSolution, binCapacity)
+        print(f"Best Solution Uses {bestBinCount} Bins")
+        print(f"Best Solution: {bestSolution}")
+
+        print("\nImprovement Over Generations:")
+        for gen, bins in enumerate(improvementCurve):
+            print(f"Generation {gen + 1}: {bins} bins")
+
+
+def hybridGeneticAlgorithmBPP(
+    items,
+    binCapacity,
+    populationSize,
+    generations,
+    mutationRate,
+    tournamentSize,
+    patience=10,
+):
+    population = createInitialPopulation(items, populationSize, binCapacity)
+    bestFitnessOverTime = []
+    noImprovementCount = 0
+    bestSolution = None
+    bestFitness = float("inf")
+
+    for gen in range(generations):
+        fitnesses = [
+            Individual.fitness(solution, binCapacity) for solution in population
+        ]
+        currentBestFitness = min(fitnesses)
+        bestFitnessOverTime.append(currentBestFitness)
+
+        if currentBestFitness < bestFitness:
+            bestFitness = currentBestFitness
+            bestSolution = population[fitnesses.index(bestFitness)]
+            noImprovementCount = 0
+        else:
+            noImprovementCount += 1
+
+        if noImprovementCount >= patience:
+            break
+
+        selectedPopulation = selection(population, fitnesses, tournamentSize)
+        nextGeneration = []
+
+        for i in range(0, len(selectedPopulation) - 1, 2):
+            parent1, parent2 = selectedPopulation[i], selectedPopulation[i + 1]
+            child = crossover(parent1, parent2, binCapacity)
+            mutate(child, binCapacity, mutationRate)
+            nextGeneration.append(child)
+
+        combinedSolution = wisdomOfCrowds(population, fitnesses, binCapacity)
+        nextGeneration.append(combinedSolution)
+        population = nextGeneration
+
+    return bestSolution, bestFitnessOverTime
+
+
+if __name__ == "__main__":
+    app = BinPackingGUI()
+    app.mainloop()
