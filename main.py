@@ -2,10 +2,9 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 import tkinter as tk
-from tkinter import ttk
 
 # Dataset details
-inputFile = "large2Data.txt"
+inputFile = "uniformData.txt"
 
 
 class BinPackingProblem:
@@ -27,18 +26,25 @@ binCapacity, items = readItemsFile(inputFile)
 
 # Genetic Algorithm Classes and Functions
 class Individual:
+    @staticmethod
     def fitness(solution, binCapacity):
         bins = []
+        currentBin = []
+        currentBinWeight = 0
+
         for itemSize in solution:
-            placed = False
-            for bin in bins:
-                if sum(bin) + itemSize <= binCapacity:
-                    bin.append(itemSize)
-                    placed = True
-                    break
-            if not placed:
-                bins.append([itemSize])
-        return len(bins)
+            if currentBinWeight + itemSize <= binCapacity:
+                currentBin.append(itemSize)
+                currentBinWeight += itemSize
+            else:
+                bins.append(currentBin)
+                currentBin = [itemSize]
+                currentBinWeight = itemSize
+
+        if currentBin:
+            bins.append(currentBin)  # Add the last bin if it contains any items
+
+        return len(bins), bins
 
 
 def createInitialPopulation(items, populationSize, binCapacity):
@@ -57,12 +63,14 @@ def selection(population, fitnesses, tournamentSize):
 
 
 def crossover(parent1, parent2, binCapacity):
+    # Simple one-point crossover
     midpoint = len(parent1) // 2
     child = parent1[:midpoint] + parent2[midpoint:]
     return child
 
 
 def mutate(solution, binCapacity, mutationRate=0.1):
+    # Mutate by swapping two random items
     for _ in range(int(len(solution) * mutationRate)):
         i, j = random.sample(range(len(solution)), 2)
         solution[i], solution[j] = solution[j], solution[i]
@@ -104,7 +112,6 @@ class BinPackingGUI(tk.Tk):
         self.bestSolutionLabel.pack()
 
     def runAlgorithm(self):
-
         populationSize = 50
         generations = 100
         mutationRate = 0.05
@@ -119,11 +126,11 @@ class BinPackingGUI(tk.Tk):
             tournamentSize,
         )
 
-        bestBinCount = Individual.fitness(bestSolution, binCapacity)
+        bestBinCount, binsUsed = Individual.fitness(bestSolution, binCapacity)
 
         # Display best solution in the GUI
         self.bestSolutionLabel.config(
-            text=f"Best Solution Uses {bestBinCount} Bins\nBest Solution: {bestSolution}"
+            text=f"Best Solution Uses {bestBinCount} Bins\nBest Solution: {binsUsed}"
         )
 
         # Plot the improvement curve in the GUI
@@ -144,13 +151,25 @@ class BinPackingGUI(tk.Tk):
 
     def printResults(self, bestSolution, improvementCurve):
         # Print the best solution and improvement curve to the terminal
-        bestBinCount = Individual.fitness(bestSolution, binCapacity)
+        bestBinCount, binsUsed = Individual.fitness(bestSolution, binCapacity)
         print(f"Best Solution Uses {bestBinCount} Bins")
-        print(f"Best Solution: {bestSolution}")
+        print(f"Best Solution (Bins): {binsUsed}")
 
-        print("\nImprovement Over Generations:")
-        for gen, bins in enumerate(improvementCurve):
-            print(f"Generation {gen + 1}: {bins} bins")
+        print("\nPacking Summary:")
+        print(f"The solution uses {bestBinCount} bins to pack the items.")
+        print("Bin contents (items in each bin):")
+        for i, bin in enumerate(binsUsed, 1):
+            print(f"  Bin {i}: {bin}")
+
+        print("\nImprovement Overview:")
+        print(
+            "The algorithm progressively reduced the number of bins used over the course of the run."
+        )
+        print("Final packing solution:")
+        print(f"  Uses {bestBinCount} bins.")
+        print("Packing details:")
+        for i, bin in enumerate(binsUsed, 1):
+            print(f"  Bin {i}: {bin}")
 
 
 def hybridGeneticAlgorithmBPP(
@@ -170,7 +189,7 @@ def hybridGeneticAlgorithmBPP(
 
     for gen in range(generations):
         fitnesses = [
-            Individual.fitness(solution, binCapacity) for solution in population
+            Individual.fitness(solution, binCapacity)[0] for solution in population
         ]
         currentBestFitness = min(fitnesses)
         bestFitnessOverTime.append(currentBestFitness)
