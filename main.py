@@ -163,7 +163,8 @@ class BinPackingGUI(tk.Tk):
     def printResults(self, bestSolution, improvementCurve):
         # Print the best solution and improvement curve to the terminal
         bestBinCount, binsUsed = Individual.fitness(bestSolution, binCapacity)
-
+        
+        print(f"The bin capacity is: {binCapacity}")
         print("\nPacking Summary:")
         print(f"The solution uses {bestBinCount} bins to pack the items.")
         print("Bin contents (items in each bin):")
