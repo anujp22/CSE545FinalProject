@@ -4,8 +4,19 @@ import matplotlib.pyplot as plt
 import tkinter as tk
 
 # Dataset details
-inputFile = "uniformData.txt"
+inputFile = "data/randomlyGenerated.txt"
 
+def generate_data(file_path, bin_capacity=150, num_items=200):
+    with open(file_path, "w") as file:
+        # Write bin capacity as the first line
+        file.write(f"Bin Capacity: {bin_capacity}\n")
+
+        # Generate and write random item weights between 20 and 80
+        for _ in range(num_items):
+            item_weight = random.randint(20, 80)
+            file.write(f"{item_weight}\n")
+
+generate_data(inputFile)
 
 class BinPackingProblem:
     def __init__(self, capacity, itemWeights):
@@ -152,22 +163,10 @@ class BinPackingGUI(tk.Tk):
     def printResults(self, bestSolution, improvementCurve):
         # Print the best solution and improvement curve to the terminal
         bestBinCount, binsUsed = Individual.fitness(bestSolution, binCapacity)
-        print(f"Best Solution Uses {bestBinCount} Bins")
-        print(f"Best Solution (Bins): {binsUsed}")
 
         print("\nPacking Summary:")
         print(f"The solution uses {bestBinCount} bins to pack the items.")
         print("Bin contents (items in each bin):")
-        for i, bin in enumerate(binsUsed, 1):
-            print(f"  Bin {i}: {bin}")
-
-        print("\nImprovement Overview:")
-        print(
-            "The algorithm progressively reduced the number of bins used over the course of the run."
-        )
-        print("Final packing solution:")
-        print(f"  Uses {bestBinCount} bins.")
-        print("Packing details:")
         for i, bin in enumerate(binsUsed, 1):
             print(f"  Bin {i}: {bin}")
 
